@@ -1,6 +1,6 @@
 /*
  * File:        ColVis.js
- * Version:     1.0.8
+ * Version:     1.0.9.dev
  * CVS:         $Id$
  * Description: Controls for column visiblity in DataTables
  * Author:      Allan Jardine (www.sprymedia.co.uk)
@@ -159,7 +159,7 @@ ColVis = function( oDTSettings, oInit )
 		 *  @type     Integer
 		 *  @default  500
 		 */
-		"iOverlayFade": 0,
+		"iOverlayFade": 500,
 		
 		/**
 		 * Label callback for column names. Takes three parameters: 1. the column index, 2. the column
@@ -610,15 +610,18 @@ ColVis.prototype = {
 			var oldIndex = $.fn.dataTableExt.iApiIndex;
 			$.fn.dataTableExt.iApiIndex = that._fnDataTablesApiIndex.call(that);
 
-			that.s.dt.oInstance.fnSetColumnVis( i, showHide, false );
-			that.s.dt.oInstance.fnAdjustColumnSizing( false );
-
+			// Optimisation for server-side processing when scrolling - don't do a full redraw
 			if ( dt.oFeatures.bServerSide && (dt.oScroll.sX !== "" || dt.oScroll.sY !== "" ) )
 			{
-				that.s.dt.oInstance.oApi._fnScrollDraw( that.s.dt );				
+				that.s.dt.oInstance.fnSetColumnVis( i, showHide, false );
+				that.s.dt.oInstance.fnAdjustColumnSizing( false );
+				that.s.dt.oInstance.oApi._fnScrollDraw( that.s.dt );
+				that._fnDrawCallback();
 			}
-			
-			that._fnDrawCallback();
+			else
+			{
+				that.s.dt.oInstance.fnSetColumnVis( i, showHide );
+			}
 
 			$.fn.dataTableExt.iApiIndex = oldIndex; /* Restore */
 			
@@ -771,7 +774,7 @@ ColVis.prototype = {
 	 */
 	"_fnCollectionShow": function ()
 	{
-		var that = this, i, iLen;
+		var that = this, i, iLen, iLeft;
 		var oPos = $(this.dom.button).offset();
 		var nHidden = this.dom.collection;
 		var nBackground = this.dom.background;
@@ -783,14 +786,14 @@ ColVis.prototype = {
 			nHidden.style.top = iDivY+"px";
 			nHidden.style.left = iDivX+"px";
 		}
-		nHidden.style.display = "block";
-		$(nHidden).css('opacity',0);
 		
-		var iWinHeight = $(window).height(), iDocHeight = $(document).height(),
-		 	iWinWidth = $(window).width(), iDocWidth = $(document).width();
+		$(nHidden).css( {
+			'display': 'block',
+			'opacity': 0
+		} );
 		
-		nBackground.style.height = ((iWinHeight>iDocHeight)? iWinHeight : iDocHeight) +"px";
-		nBackground.style.width = ((iWinWidth<iDocWidth)? iWinWidth : iDocWidth) +"px";
+		nBackground.style.bottom ='0px';
+		nBackground.style.right = '0px';
 		
 		var oStyle = this.dom.catcher.style;
 		oStyle.height = $(this.dom.button).outerHeight()+"px";
@@ -826,34 +829,38 @@ ColVis.prototype = {
 			this.dom.collection.style.width = iMax+"px";
 		}
 		
+		/* This results in a very small delay for the end user but it allows the animation to be
+		 * much smoother. If you don't want the animation, then the setTimeout can be removed
+		 */
+		$(nHidden).animate({"opacity": 1}, that.s.iOverlayFade);
+		$(nBackground).animate({"opacity": 0.1}, that.s.iOverlayFade, 'linear', function () {
+			/* In IE6 if you set the checked attribute of a hidden checkbox, then this is not visually
+			 * reflected. As such, we need to do it here, once it is visible. Unbelievable.
+			 */
+			if ( jQuery.browser.msie && jQuery.browser.version == "6.0" )
+			{
+				that._fnDrawCallback();
+			}
+		});
+		
 		/* Visual corrections to try and keep the collection visible */
 		if ( !this.s.bCssPosition )
 		{
-			nHidden.style.left = this.s.sAlign=="left" ?
-				iDivX+"px" : (iDivX-$(nHidden).outerWidth()+$(this.dom.button).outerWidth())+"px";
+			iLeft = ( this.s.sAlign=="left" ) ?
+				iDivX :
+				iDivX - $(nHidden).outerWidth() + $(this.dom.button).outerWidth();
+
+			nHidden.style.left = iLeft+"px";
 
 			var iDivWidth = $(nHidden).outerWidth();
 			var iDivHeight = $(nHidden).outerHeight();
+			var iDocWidth = $(document).width();
 			
-			if ( iDivX + iDivWidth > iDocWidth )
+			if ( iLeft + iDivWidth > iDocWidth )
 			{
 				nHidden.style.left = (iDocWidth-iDivWidth)+"px";
 			}
 		}
-		
-		/* This results in a very small delay for the end user but it allows the animation to be
-		 * much smoother. If you don't want the animation, then the setTimeout can be removed
-		 */
-			$(nHidden).animate({"opacity": 1}, that.s.iOverlayFade);
-			$(nBackground).animate({"opacity": 0.1}, that.s.iOverlayFade, 'linear', function () {
-				/* In IE6 if you set the checked attribute of a hidden checkbox, then this is not visually
-				 * reflected. As such, we need to do it here, once it is visible. Unbelievable.
-				 */
-				if ( jQuery.browser.msie && jQuery.browser.version == "6.0" )
-				{
-					that._fnDrawCallback();
-				}
-			});
 		
 		this.s.hidden = false;
 	},
@@ -971,7 +978,7 @@ ColVis.prototype.CLASS = "ColVis";
  *  @type      String
  *  @default   See code
  */
-ColVis.VERSION = "1.0.8";
+ColVis.VERSION = "1.0.9.dev";
 ColVis.prototype.VERSION = ColVis.VERSION;
 
 
