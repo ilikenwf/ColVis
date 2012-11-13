@@ -611,17 +611,15 @@ ColVis.prototype = {
 			$.fn.dataTableExt.iApiIndex = that._fnDataTablesApiIndex.call(that);
 
 			// Optimisation for server-side processing when scrolling - don't do a full redraw
+			that.s.dt.oInstance.fnSetColumnVis( i, showHide, false );
+			that.s.dt.oInstance.fnAdjustColumnSizing( false );
+
 			if ( dt.oFeatures.bServerSide && (dt.oScroll.sX !== "" || dt.oScroll.sY !== "" ) )
 			{
-				that.s.dt.oInstance.fnSetColumnVis( i, showHide, false );
-				that.s.dt.oInstance.fnAdjustColumnSizing( false );
-				that.s.dt.oInstance.oApi._fnScrollDraw( that.s.dt );
-				that._fnDrawCallback();
+				that.s.dt.oInstance.oApi._fnScrollDraw( that.s.dt );				
 			}
-			else
-			{
-				that.s.dt.oInstance.fnSetColumnVis( i, showHide );
-			}
+			
+			that._fnDrawCallback();
 
 			$.fn.dataTableExt.iApiIndex = oldIndex; /* Restore */
 			
